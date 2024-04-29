@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.12736416, g: 0.13419397, b: 0.12112127, a: 1}
+  m_IndirectSpecularColor: {r: 0.12731749, g: 0.13414757, b: 0.1210787, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -445,7 +445,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1951498504}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 40ff2e515a81541cbb664860588e2c6e, type: 3}
+  m_Script: {fileID: 11500000, guid: d40ff17e94a045cdbc3564ff167742a0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _sourceType: 0
@@ -457,5 +457,5 @@ MonoBehaviour:
   _webcamResolution: {x: 1920, y: 1080}
   _webcamFrameRate: 30
   _outputTexture: {fileID: 8400000, guid: e0658b48cd5b040da854cdbd07f714de, type: 2}
-  _outputResolution: {x: 1024, y: 1024}
-  _shader: {fileID: 4800000, guid: 3f7d8db4748f54c638a46cec0b0e61f8, type: 3}
+  _outputResolution: {x: 1920, y: 1080}
+  _shader: {fileID: 0}
