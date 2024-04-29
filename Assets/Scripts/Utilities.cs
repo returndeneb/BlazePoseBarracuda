@@ -1,4 +1,5 @@
 using Unity.Barracuda;
+// using Unity.Sentis;
 using UnityEngine;
 
 namespace MediaPipe.BlazePose {
@@ -16,6 +17,8 @@ static class IWorkerExtensions
         var rt = RenderTexture.GetTemporary(w, h, 0, fmt);
         using (var tensor = worker.PeekOutput(name).Reshape(shape))
             tensor.ToRenderTexture(rt);
+        // using (var tensor = worker.PeekOutput(name).ShallowReshape(shape) as TensorFloat)
+        //     TextureConverter.RenderToTexture(tensor,rt);
         return rt;
     }
 }

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Unity.Barracuda;
+// using Unity.Sentis;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace MediaPipe.BlazePose {
 
@@ -38,11 +38,17 @@ public sealed partial class PoseDetector : System.IDisposable
         _countBuffer = new ComputeBuffer
             (1, sizeof(uint), ComputeBufferType.Raw);
 
-        _worker = WorkerFactory.CreateWorker( ModelLoader.Load(_resources.detectionModel));
+        _worker = WorkerFactory.CreateWorker(ModelLoader.Load(_resources.detectionModel));
+        // _worker = WorkerFactory.CreateWorker(BackendType.GPUCompute,ModelLoader.Load(_resources.detectionModel));
         
         var shape = new TensorShape(1, DetectionImageSize, DetectionImageSize, 3);
+        // var shape = new TensorShape(1, 3, DetectionImageSize, DetectionImageSize);
+        
         _tensorData = new ComputeTensorData(shape, "name", 0, false);
         _tensor = new Tensor(shape);
+        // _tensorData = new ComputeTensorData(shape, false);
+        // _tensor = TensorFloat.Zeros(shape);
+        
         _tensor.AttachToDevice(_tensorData);
     }
     

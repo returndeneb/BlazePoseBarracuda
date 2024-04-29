@@ -1,5 +1,7 @@
 using UnityEngine;
 using Unity.Barracuda;
+// using Unity.Sentis;
+
 
 namespace MediaPipe.BlazePose {
 
@@ -9,7 +11,7 @@ namespace MediaPipe.BlazePose {
 public sealed class ResourceSet : ScriptableObject
 {
     public NNModel detectionModel;
-    public NNModel landmarkModel;
+    // public ModelAsset detectionModel;
     public ComputeShader preprocess;
     public ComputeShader postprocess1;
     public ComputeShader postprocess2;
