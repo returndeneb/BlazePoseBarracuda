@@ -6,12 +6,6 @@ namespace Klak.TestTools {
 
 public sealed class ImageSource : MonoBehaviour
 {
-    #region Public property
-
-    public Texture Texture => OutputBuffer;
-    public Vector2Int OutputResolution => _outputResolution;
-
-    #endregion
 
     #region Editable attributes
 
@@ -20,12 +14,12 @@ public sealed class ImageSource : MonoBehaviour
     [SerializeField] SourceType _sourceType = SourceType.Card;
 
     // Texture mode options
-    [SerializeField] Texture2D _texture = null;
-    [SerializeField] string _textureUrl = null;
+    [SerializeField] Texture2D _texture;
+    [SerializeField] string _textureUrl;
 
     // Video mode options
-    [SerializeField] VideoClip _video = null;
-    [SerializeField] string _videoUrl = null;
+    [SerializeField] VideoClip _video;
+    [SerializeField] string _videoUrl;
 
     // Webcam options
     [SerializeField] string _webcamName = "";
