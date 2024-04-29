@@ -1,84 +1,53 @@
 using System.Collections.Generic;
 using Unity.Barracuda;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace MediaPipe.BlazePose {
 
 public sealed partial class PoseDetector : System.IDisposable
 {
-    #region Public accessors
-
-    public ComputeBuffer DetectionBuffer
-      => _post2Buffer;
-
-    public IEnumerable<Detection> Detections
-      => _post2ReadCache ?? UpdatePost2ReadCache();
-
-    #endregion
-
-    #region Public methods
-
-    public PoseDetector(ResourceSet resources)
-    {
-        _resources = resources;
-        AllocateObjects();
-    }
-
-    public void Dispose()
-      => DeallocateObjects();
-
-    public void ProcessImage(Texture image)
-      => RunModel(image);
-
-    #endregion
-
-    #region Compile-time constants
-
-    // Maximum number of detections. This value must be matched with
-    // MAX_DETECTION in Common.hlsl.
-    const int MaxDetection = 64;
-
-    const int DetectionImageSize = 224;
-
-    #endregion
-
-    #region Private objects
 
     ResourceSet _resources;
-    // ComputeBuffer _preBuffer;
     ComputeBuffer _post1Buffer;
     ComputeBuffer _post2Buffer;
     ComputeBuffer _countBuffer;
     IWorker _worker;
     private Tensor _tensor;
     ComputeTensorData _tensorData;
-
-    void AllocateObjects()
+    
+    const int MaxDetection = 64;
+    const int DetectionImageSize = 224;
+        
+    Detection[] _post2ReadCache;
+    int[] _countReadCache = new int[1];
+    
+    public IEnumerable<Detection> Detections
+      => _post2ReadCache ?? UpdatePost2ReadCache();
+    
+    public PoseDetector(ResourceSet resources)
     {
-        var model = ModelLoader.Load(_resources.detectionModel);
+        _resources = resources;
+        
+        _post1Buffer = new ComputeBuffer
+            (MaxDetection, Detection.Size, ComputeBufferType.Append);
 
-        // _preBuffer = new ComputeBuffer
-        //   (DetectionImageSize * DetectionImageSize * 3, sizeof(float));
+        _post2Buffer = new ComputeBuffer
+            (MaxDetection, Detection.Size, ComputeBufferType.Append);
+
+        _countBuffer = new ComputeBuffer
+            (1, sizeof(uint), ComputeBufferType.Raw);
+
+        _worker = WorkerFactory.CreateWorker( ModelLoader.Load(_resources.detectionModel));
+        
         var shape = new TensorShape(1, DetectionImageSize, DetectionImageSize, 3);
         _tensorData = new ComputeTensorData(shape, "name", 0, false);
         _tensor = new Tensor(shape);
         _tensor.AttachToDevice(_tensorData);
-        _post1Buffer = new ComputeBuffer
-          (MaxDetection, Detection.Size, ComputeBufferType.Append);
-
-        _post2Buffer = new ComputeBuffer
-          (MaxDetection, Detection.Size, ComputeBufferType.Append);
-
-        _countBuffer = new ComputeBuffer
-          (1, sizeof(uint), ComputeBufferType.Raw);
-
-        _worker = model.CreateWorker();
     }
-
-    void DeallocateObjects()
+    
+    public void Dispose()
     {
-        // _preBuffer?.Dispose();
-        // _preBuffer = null;
         _tensor?.Dispose();
         _tensor = null;
         _tensorData = null;
@@ -96,79 +65,51 @@ public sealed partial class PoseDetector : System.IDisposable
         _worker = null;
     }
 
-    #endregion
-
-    #region Neural network inference function
-
-    void RunModel(Texture source)
+    public void ProcessImage(Texture image)
     {
-        // Reset the compute buffer counters.
         _post1Buffer.SetCounterValue(0);
         _post2Buffer.SetCounterValue(0);
 
-        // Preprocessing
         var pre = _resources.preprocess;
+        var post1 = _resources.postprocess1;
+        var post2 = _resources.postprocess2;
+        
         pre.SetInt("_Size", DetectionImageSize);
         pre.SetVector("_Range", new Vector2(-1, 1));
-        pre.SetTexture(0, "_Texture", source);
+        pre.SetTexture(0, "_Texture", image);
         pre.SetBuffer(0, "_Tensor", _tensorData.buffer);
         pre.Dispatch(0, DetectionImageSize / 8, DetectionImageSize / 8, 1);
 
-        // Run the BlazePose model.
-        // using (var tensor = new Tensor(1, DetectionImageSize, DetectionImageSize, 3, _preBuffer))
-        //     _worker.Execute(tensor);
-
         _worker.Execute(_tensor);
 
-        // Output tensors -> Temporary render textures
         var scoresRT = _worker.CopyOutputToTempRT("Identity_1",  1, 2254);
         var  boxesRT = _worker.CopyOutputToTempRT("Identity"  , 12, 2254);
-
-        // 1st postprocess (bounding box aggregation)
-        var post1 = _resources.postprocess1;
-
-        //post1.SetInt("_RowOffset", 0);
+        
         post1.SetInt("_RowOffset", 2254 - 1568);
         post1.SetTexture(0, "_Scores", scoresRT);
         post1.SetTexture(0, "_Boxes", boxesRT);
         post1.SetBuffer(0, "_Output", _post1Buffer);
         post1.Dispatch(0, 1, 1, 1);
 
-        //post1.SetInt("_RowOffset", 1568);
         post1.SetInt("_RowOffset", 2254 - 1960);
         post1.SetTexture(1, "_Scores", scoresRT);
         post1.SetTexture(1, "_Boxes", boxesRT);
         post1.SetBuffer(1, "_Output", _post1Buffer);
         post1.Dispatch(1, 1, 1, 1);
 
-        // Release the temporary render textures.
         RenderTexture.ReleaseTemporary(scoresRT);
         RenderTexture.ReleaseTemporary(boxesRT);
-
-        // Retrieve the bounding box count.
         ComputeBuffer.CopyCount(_post1Buffer, _countBuffer, 0);
-
-        // 2nd postprocess (overlap removal)
-        var post2 = _resources.postprocess2;
+        
         post2.SetBuffer(0, "_Input", _post1Buffer);
         post2.SetBuffer(0, "_Count", _countBuffer);
         post2.SetBuffer(0, "_Output", _post2Buffer);
         post2.Dispatch(0, 1, 1, 1);
 
-        // Retrieve the bounding box count after removal.
         ComputeBuffer.CopyCount(_post2Buffer, _countBuffer, 0);
-
-        // Read cache invalidation
         _post2ReadCache = null;
     }
-
-    #endregion
-
-    #region GPU to CPU readback
-
-    Detection[] _post2ReadCache;
-    int[] _countReadCache = new int[1];
-
+    
     Detection[] UpdatePost2ReadCache()
     {
         _countBuffer.GetData(_countReadCache, 0, 0, 1);
@@ -179,8 +120,5 @@ public sealed partial class PoseDetector : System.IDisposable
 
         return _post2ReadCache;
     }
-
-    #endregion
 }
-
-} // namespace MediaPipe.BlazePose
+} 
