@@ -45,19 +45,24 @@ public sealed partial class PoseDetector : System.IDisposable
     #region Private objects
 
     ResourceSet _resources;
-    ComputeBuffer _preBuffer;
+    // ComputeBuffer _preBuffer;
     ComputeBuffer _post1Buffer;
     ComputeBuffer _post2Buffer;
     ComputeBuffer _countBuffer;
     IWorker _worker;
+    private Tensor _tensor;
+    ComputeTensorData _tensorData;
 
     void AllocateObjects()
     {
         var model = ModelLoader.Load(_resources.detectionModel);
 
-        _preBuffer = new ComputeBuffer
-          (DetectionImageSize * DetectionImageSize * 3, sizeof(float));
-
+        // _preBuffer = new ComputeBuffer
+        //   (DetectionImageSize * DetectionImageSize * 3, sizeof(float));
+        var shape = new TensorShape(1, DetectionImageSize, DetectionImageSize, 3);
+        _tensorData = new ComputeTensorData(shape, "name", 0, false);
+        _tensor = new Tensor(shape);
+        _tensor.AttachToDevice(_tensorData);
         _post1Buffer = new ComputeBuffer
           (MaxDetection, Detection.Size, ComputeBufferType.Append);
 
@@ -72,8 +77,11 @@ public sealed partial class PoseDetector : System.IDisposable
 
     void DeallocateObjects()
     {
-        _preBuffer?.Dispose();
-        _preBuffer = null;
+        // _preBuffer?.Dispose();
+        // _preBuffer = null;
+        _tensor?.Dispose();
+        _tensor = null;
+        _tensorData = null;
 
         _post1Buffer?.Dispose();
         _post1Buffer = null;
@@ -103,12 +111,14 @@ public sealed partial class PoseDetector : System.IDisposable
         pre.SetInt("_Size", DetectionImageSize);
         pre.SetVector("_Range", new Vector2(-1, 1));
         pre.SetTexture(0, "_Texture", source);
-        pre.SetBuffer(0, "_Tensor", _preBuffer);
+        pre.SetBuffer(0, "_Tensor", _tensorData.buffer);
         pre.Dispatch(0, DetectionImageSize / 8, DetectionImageSize / 8, 1);
 
         // Run the BlazePose model.
-        using (var tensor = new Tensor(1, DetectionImageSize, DetectionImageSize, 3, _preBuffer))
-            _worker.Execute(tensor);
+        // using (var tensor = new Tensor(1, DetectionImageSize, DetectionImageSize, 3, _preBuffer))
+        //     _worker.Execute(tensor);
+
+        _worker.Execute(_tensor);
 
         // Output tensors -> Temporary render textures
         var scoresRT = _worker.CopyOutputToTempRT("Identity_1",  1, 2254);
